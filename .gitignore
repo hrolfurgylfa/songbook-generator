@@ -1,0 +1,11 @@
+# Compiled stuff
+/target
+/libpdfium.so
+
+# Assets
+/songs
+/fonts
+/settings.toml
+
+# Editors
+.vscode
