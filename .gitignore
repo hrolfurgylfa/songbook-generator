@@ -1,11 +1,15 @@
 # Compiled stuff
-/target
-/libpdfium.so
+target
+libpdfium.so
+output.pdf
 
 # Assets
-/songs
-/fonts
-/settings.toml
+songs
+fonts
+settings.toml
 
 # Editors
 .vscode
+
+# Other libraries
+/genpdf-rs-patched

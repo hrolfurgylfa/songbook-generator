@@ -1,32 +1,14 @@
-use config::{BookConfig, FileBookConfig};
-use pdfium_render::prelude::{PdfDocument, PdfPoints, Pdfium, PdfiumError};
+use generator::{config, tile};
+use pdfium_render::prelude::{Pdfium, PdfiumError, PdfDocument, PdfPoints};
+use serde::Deserialize;
 
-mod config;
-mod gen_pdfs;
-mod tile;
-
-fn generate_book_pdfs(config: &BookConfig) -> Vec<Vec<u8>> {
-    let font = gen_pdfs::load_font(&config.preferred_font);
-    let mut pdfs = Vec::with_capacity(
-        config.front_pages.len()
-            + config.back_pages.len()
-            + (if config.songs.is_empty() { 0 } else { 1 }),
-    );
-
-    for page in &config.front_pages {
-        pdfs.push(gen_pdfs::generate_page(&font, &config.songs, page));
-    }
-
-    if !config.songs.is_empty() {
-        let songs = gen_pdfs::generate_songs(&font, &config.songs);
-        pdfs.push(songs);
-    }
-
-    for page in config.back_pages.iter() {
-        pdfs.push(gen_pdfs::generate_page(&font, &config.songs, page));
-    }
-
-    return pdfs;
+#[derive(Debug, Clone, Deserialize)]
+pub struct FileBookConfig {
+    #[serde(rename = "front")]
+    pub front_pages: Vec<config::Page>,
+    #[serde(rename = "back")]
+    pub back_pages: Vec<config::Page>,
+    pub preferred_font: String,
 }
 
 fn parse_song_body(body: &str) -> Vec<String> {
@@ -109,7 +91,7 @@ fn parse_args() -> config::BookConfig {
     }
 
     let file_book_config = config.expect("No .toml configuration file provided.");
-    return BookConfig {
+    return config::BookConfig {
         front_pages: file_book_config.front_pages,
         back_pages: file_book_config.back_pages,
         preferred_font: file_book_config.preferred_font,
@@ -152,7 +134,7 @@ fn main() -> Result<(), PdfiumError> {
         Pdfium::pdfium_platform_library_name_at_path("./"),
     )?);
     let config = parse_args();
-    let pdfs = generate_book_pdfs(&config);
+    let pdfs = generator::generate_book_pdfs(&config);
 
     let linear_doc = tile::merge_pdfs(&pdfium, pdfs)?;
     // let merged_doc = tile::mix_first_and_last(&pdfium, linear_doc)?;

@@ -31,22 +31,13 @@ pub enum Page {
     FrontPage(FrontPage),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Song {
     pub title: String,
     pub body: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct FileBookConfig {
-    #[serde(rename = "front")]
-    pub front_pages: Vec<Page>,
-    #[serde(rename = "back")]
-    pub back_pages: Vec<Page>,
-    pub preferred_font: String,
-}
-
-#[derive(Debug, Clone)]
 pub struct BookConfig {
     pub front_pages: Vec<Page>,
     pub back_pages: Vec<Page>,
