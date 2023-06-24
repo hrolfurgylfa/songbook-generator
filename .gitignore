@@ -2,6 +2,7 @@
 target
 libpdfium.so
 output.pdf
+generator/pkg
 
 # Assets
 songs
@@ -13,3 +14,4 @@ settings.toml
 
 # Other libraries
 /genpdf-rs-patched
+/printpdf

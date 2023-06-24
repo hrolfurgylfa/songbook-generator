@@ -1,6 +1,12 @@
-use generator::{config, tile};
-use pdfium_render::prelude::{Pdfium, PdfiumError, PdfDocument, PdfPoints};
+use std::fs;
+
+use generator::config;
+use pdfium_render::prelude::PdfiumError;
 use serde::Deserialize;
+
+fn true_func() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct FileBookConfig {
@@ -9,6 +15,8 @@ pub struct FileBookConfig {
     #[serde(rename = "back")]
     pub back_pages: Vec<config::Page>,
     pub preferred_font: String,
+    #[serde(default = "true_func")]
+    pub reorder_pages: bool,
 }
 
 fn parse_song_body(body: &str) -> Vec<String> {
@@ -95,52 +103,14 @@ fn parse_args() -> config::BookConfig {
         front_pages: file_book_config.front_pages,
         back_pages: file_book_config.back_pages,
         preferred_font: file_book_config.preferred_font,
+        reorder_pages: file_book_config.reorder_pages,
         songs,
     };
 }
 
-fn _print_pdf_info(pdf: &PdfDocument) {
-    println!(
-        "PDF length: {}kb",
-        pdf.save_to_bytes().unwrap().len() as f32 / 1000.0
-    );
-
-    let font_size = PdfPoints::new(12.0);
-    if pdf.pages().is_empty() {
-        println!("There are no pages in this pdf.");
-    }
-    for (page_index, page) in pdf.pages().iter().enumerate() {
-        if page.fonts().is_empty() {
-            println!("There are no fonts on page {}", page_index);
-        }
-        for (font_index, font) in page.fonts().iter().enumerate() {
-            println!(
-                    "Font {} on page {} is embedded: name = {}, is symbolic? {}, is non-symbolic? {}, ascent {:?}, descent {:?}, number of glyphs: {}",
-                    font_index,
-                    page_index,
-                    font.name(),
-                    font.is_symbolic(),
-                    font.is_non_symbolic(),
-                    font.ascent(font_size),
-                    font.descent(font_size),
-                    font.glyphs().len()
-                );
-        }
-    }
-}
-
 fn main() -> Result<(), PdfiumError> {
-    let pdfium = Pdfium::new(Pdfium::bind_to_library(
-        Pdfium::pdfium_platform_library_name_at_path("./"),
-    )?);
     let config = parse_args();
-    let pdfs = generator::generate_book_pdfs(&config);
-
-    let linear_doc = tile::merge_pdfs(&pdfium, pdfs)?;
-    // let merged_doc = tile::mix_first_and_last(&pdfium, linear_doc)?;
-    let tiled_doc = tile::tile_pages(linear_doc.pages(), 0.9)?;
-    tiled_doc.save_to_file("output.pdf")?;
-    // print_pdf_info(&tiled_doc);
-
+    let pdf = generator::generate_book_pdf(&config)?;
+    fs::write("output.pdf", pdf).expect("Failed to write output.pdf");
     Ok(())
 }

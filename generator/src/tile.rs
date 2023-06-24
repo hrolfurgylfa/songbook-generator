@@ -39,7 +39,7 @@ pub fn merge_pdfs<'a>(
 
 pub fn mix_first_and_last<'a>(
     pdfium: &'a Pdfium,
-    pdf: PdfDocument<'a>,
+    pdf: &PdfDocument<'a>,
 ) -> Result<PdfDocument<'a>, PdfiumError> {
     assert!(pdf.pages().len() > 1);
 

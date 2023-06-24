@@ -43,4 +43,5 @@ pub struct BookConfig {
     pub back_pages: Vec<Page>,
     pub songs: Vec<Song>,
     pub preferred_font: String,
+    pub reorder_pages: bool,
 }
