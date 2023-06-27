@@ -17,7 +17,7 @@ pub enum Message {
     ChangeReorderPages(bool),
     WriteSettings,
     GeneratePdf,
-    AddSong(generator::config::Song),
+    AddSong(String),
     MoveSong(usize, usize),
     RemoveSong(usize),
 }
@@ -46,15 +46,15 @@ fn font_exists(font: &str) -> bool {
     return true;
 }
 
-struct ItemListConfig<'a, 'b, T>
+struct ItemListConfig<'a, T>
 where
     T: std::fmt::Display + Clone,
 {
     label: &'a str,
     items: &'a [T],
     render_item: Box<dyn Fn(&'a T) -> Element<'a, Message>>,
-    add_options: &'b [T],
-    on_add: Box<dyn Fn(T) -> Message>,
+    add_options: Vec<String>,
+    on_add: Box<dyn Fn(String) -> Message>,
     on_move: Box<dyn Fn(usize, usize) -> Message>,
     on_remove: Box<dyn Fn(usize) -> Message>,
 }
@@ -97,6 +97,22 @@ impl Application for State {
                 old_font, DEFAULT_FONT
             );
         }
+
+        // Add the song bodies, and remove any that can't be found
+        book.songs = book
+            .songs
+            .into_iter()
+            .filter_map(|s| match generator::load_song(&s.title) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    println!(
+                        "Failed to find song \"{}\": {}. Removing it from the current songbook",
+                        s.title, e
+                    );
+                    None
+                }
+            })
+            .collect();
 
         // Save, in case we had to change the file while loading
         fs::write(
@@ -149,13 +165,7 @@ impl Application for State {
                     label: "Songs",
                     items: &self.book.songs,
                     render_item: Box::new(|s| text(&s.title).into()),
-                    add_options: &get_available_songs()
-                        .into_iter()
-                        .map(|f| generator::config::Song {
-                            title: f,
-                            body: vec![],
-                        })
-                        .collect::<Vec<_>>(),
+                    add_options: get_available_songs(),
                     on_add: Box::new(|s| Message::AddSong(s)),
                     on_move: Box::new(|from, to| Message::MoveSong(from, to)),
                     on_remove: Box::new(|i| Message::RemoveSong(i)),
@@ -176,8 +186,8 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
-            Message::AddSong(song) => {
-                let song = match generator::load_song(&song.title) {
+            Message::AddSong(title) => {
+                let song = match generator::load_song(&title) {
                     Ok(song) => song,
                     Err(e) => {
                         println!("Failed to load song: {}", e);
@@ -283,9 +293,9 @@ impl State {
             .into()
     }
 
-    fn view_item_list<'a, 'b, T: std::fmt::Display + Clone + std::cmp::Eq>(
+    fn view_item_list<'a, T: std::fmt::Display + Clone + std::cmp::Eq>(
         &self,
-        config: ItemListConfig<'a, 'b, T>,
+        config: ItemListConfig<'a, T>,
     ) -> Element<'a, Message> {
         let ItemListConfig {
             label,
@@ -309,10 +319,7 @@ impl State {
         }
 
         column![
-            row![
-                text(label),
-                button("+").on_press(on_add(add_options.first().unwrap().clone()))
-            ],
+            row![text(label), pick_list(add_options, None, on_add),],
             songs,
         ]
         .into()
