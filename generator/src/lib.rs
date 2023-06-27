@@ -2,6 +2,8 @@ pub mod config;
 pub mod gen_pdfs;
 pub mod tile;
 
+use std::fs;
+
 use pdfium_render::prelude::{Pdfium, PdfiumError};
 use wasm_bindgen::prelude::*;
 
@@ -52,4 +54,62 @@ pub fn generate_book_pdf(config: &config::BookConfig) -> Result<Vec<u8>, PdfiumE
 pub fn generate_book_pdf_wasm(config_json: String) -> Vec<u8> {
     let config: config::BookConfig = serde_json::from_str(&config_json).unwrap();
     return generate_book_pdf(&config).unwrap();
+}
+
+pub fn load_song(title: &str) -> Result<config::Song, String> {
+    let songs =
+        fs::read_dir("./songs/").map_err(|e| format!("Failed to read songs directory: {}", e))?;
+    for res in songs {
+        let path = match res {
+            Ok(song) => song.path(),
+            Err(e) => {
+                println!("Failed to read directory entry: {}", e);
+                continue;
+            }
+        };
+
+        let name = path
+            .file_stem()
+            .map(|f| f.to_str().unwrap_or(""))
+            .unwrap_or("");
+
+        if name == title {
+            let body = fs::read_to_string(path.clone()).unwrap();
+            return Ok(parse_song_body(name.to_owned(), &body));
+        }
+    }
+
+    Err("Song not found".to_owned())
+}
+
+pub fn parse_song_body(title: impl ToString, body: &str) -> config::Song {
+    let mut verses = Vec::new();
+    let mut current_verse = String::new();
+
+    for line in body.lines().map(|l| l.trim()) {
+        // If we have double new line, a new verse has started. Verses can't be empty though, so
+        // only push the current verse if it's not empty.
+        if line.is_empty() && !current_verse.is_empty() {
+            verses.push(current_verse);
+            current_verse = String::new();
+            continue;
+        }
+
+        // Add the new line character  if this isn't the first line.
+        if !current_verse.is_empty() {
+            current_verse.push('\n');
+        }
+        // Add the line to the current verse.
+        current_verse.push_str(line);
+    }
+
+    // Push the last verse if it's not empty.
+    if !current_verse.is_empty() {
+        verses.push(current_verse);
+    }
+
+    config::Song {
+        title: title.to_string(),
+        body: verses,
+    }
 }

@@ -19,35 +19,6 @@ pub struct FileBookConfig {
     pub reorder_pages: bool,
 }
 
-fn parse_song_body(body: &str) -> Vec<String> {
-    let mut verses = Vec::new();
-    let mut current_verse = String::new();
-
-    for line in body.lines().map(|l| l.trim()) {
-        // If we have double new line, a new verse has started. Verses can't be empty though, so
-        // only push the current verse if it's not empty.
-        if line.is_empty() && !current_verse.is_empty() {
-            verses.push(current_verse);
-            current_verse = String::new();
-            continue;
-        }
-
-        // Add the new line character  if this isn't the first line.
-        if !current_verse.is_empty() {
-            current_verse.push('\n');
-        }
-        // Add the line to the current verse.
-        current_verse.push_str(line);
-    }
-
-    // Push the last verse if it's not empty.
-    if !current_verse.is_empty() {
-        verses.push(current_verse);
-    }
-
-    verses
-}
-
 fn parse_args() -> config::BookConfig {
     let mut args = std::env::args().skip(1);
     let mut config = None;
@@ -82,17 +53,16 @@ fn parse_args() -> config::BookConfig {
                 });
             }
             filename if filename.ends_with(".txt") => {
-                songs.push(config::Song {
-                    title: std::path::Path::new(&arg)
-                        .file_stem()
-                        .expect(&format!("Invalid song file name: \"{}\"", &arg))
-                        .to_string_lossy()
-                        .to_string(),
-                    body: parse_song_body(
-                        &std::fs::read_to_string(&arg)
-                            .expect(&format!("Failed to open song file: \"{}\"", &arg)),
-                    ),
-                });
+                let title = std::path::Path::new(&arg)
+                    .file_stem()
+                    .expect(&format!("Invalid song file name: \"{}\"", &arg))
+                    .to_string_lossy()
+                    .to_string();
+                songs.push(generator::parse_song_body(
+                    title,
+                    &std::fs::read_to_string(&arg)
+                        .expect(&format!("Failed to open song file: \"{}\"", &arg)),
+                ));
             }
             _ => panic!("Invalid argument: \"{}\"", arg),
         }

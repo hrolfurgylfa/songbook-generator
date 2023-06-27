@@ -16,7 +16,7 @@ pub fn load_font(font_name: &str) -> Font {
     //     .filter(|path| std::path::Path::new(path).exists())
     //     .next()
     //     .expect("Could not find font directory");
-    return fonts::from_files("./fonts/", font_name, None)
+    return fonts::from_files(format!("./fonts/{}/", font_name), font_name, None)
         .expect("Failed to load the default font family");
 }
 
