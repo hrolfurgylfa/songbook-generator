@@ -176,7 +176,7 @@ impl Application for State {
             ],
         );
 
-        container(content)
+        container(container(content).width(Length::Fixed(500.0)))
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
@@ -278,8 +278,7 @@ impl State {
                     container(element)
                         .width(Length::Fill)
                         .align_x(Horizontal::Right)
-                ]
-                .width(Length::Fixed(550.0)),
+                ], // .width(Length::Fixed(550.0)),
             );
         }
         for element in end_elements.into_iter() {
@@ -319,7 +318,12 @@ impl State {
         }
 
         column![
-            row![text(label), pick_list(add_options, None, on_add),],
+            row![
+                text(label),
+                container(container(pick_list(add_options, None, on_add)).width(Length::Shrink))
+                    .align_x(Horizontal::Right)
+                    .width(Length::Fill),
+            ],
             songs,
         ]
         .into()
