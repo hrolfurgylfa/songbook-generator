@@ -6,6 +6,8 @@ use std::{fs, future};
 use iced::widget::{button, checkbox, column, container, pick_list, row, text, Column};
 use iced::{executor, Alignment, Application, Command, Element, Length, Settings, Theme};
 
+use generator::config::{BookConfig, FrontPage, Page, Preface, Song, TableOfContents};
+
 #[derive(Debug, Default)]
 struct State {
     book: generator::config::BookConfig,
@@ -20,8 +22,10 @@ pub enum Message {
     AddSong(String),
     MoveSong(usize, usize),
     RemoveSong(usize),
+    AddFrontPage(String),
 }
 
+#[must_use]
 fn write_settings() -> Command<Message> {
     Command::perform(future::ready(()), |()| Message::WriteSettings)
 }
@@ -48,7 +52,7 @@ fn font_exists(font: &str) -> bool {
 
 struct ItemListConfig<'a, T>
 where
-    T: std::fmt::Display + Clone,
+    T: Clone,
 {
     label: &'a str,
     items: &'a [T],
@@ -129,7 +133,7 @@ impl Application for State {
         String::from("Skáta Söngbókin Þín")
     }
 
-    fn view(&self) -> Element<Message> {
+    fn view<'a>(&'a self) -> Element<Message> {
         let content = self.view_settings(
             vec![
                 (
@@ -170,6 +174,18 @@ impl Application for State {
                     on_move: Box::new(|from, to| Message::MoveSong(from, to)),
                     on_remove: Box::new(|i| Message::RemoveSong(i)),
                 }),
+                self.view_item_list(ItemListConfig::<'a> {
+                    label: "Front Pages",
+                    items: &self.book.front_pages,
+                    render_item: Box::new(|p| view_page(p)),
+                    add_options: ["preface", "tableofcontents", "frontpage"]
+                        .iter()
+                        .map(|f| (*f).to_owned())
+                        .collect(),
+                    on_add: Box::new(|s| Message::AddFrontPage(s)),
+                    on_move: Box::new(|from, to| Message::MoveSong(from, to)),
+                    on_remove: Box::new(|i| Message::RemoveSong(i)),
+                }),
                 container(button(text("Generate")).on_press(Message::GeneratePdf))
                     .center_x()
                     .into(),
@@ -186,6 +202,19 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
+            Message::AddFrontPage(page) => {
+                let page = match page.as_str() {
+                    "preface" => Page::Preface(Preface::default()),
+                    "tableofcontents" => Page::TableOfContents(TableOfContents::default()),
+                    "frontpage" => Page::FrontPage(FrontPage::default()),
+                    val => {
+                        println!("AddFrontPage called with some weird value: \"{}\"", val);
+                        return Command::none();
+                    }
+                };
+                self.book.front_pages.push(page);
+                write_settings()
+            }
             Message::AddSong(title) => {
                 let song = match generator::load_song(&title) {
                     Ok(song) => song,
@@ -264,6 +293,14 @@ impl Application for State {
     }
 }
 
+fn view_page(page: &generator::config::Page) -> Element<Message> {
+    match page {
+        generator::config::Page::Preface(p) => text(&p.title).into(),
+        generator::config::Page::TableOfContents(p) => text(&p.title).into(),
+        generator::config::Page::FrontPage(p) => text(&p.title).into(),
+    }
+}
+
 impl State {
     fn view_settings<'a>(
         &'a self,
@@ -292,7 +329,7 @@ impl State {
             .into()
     }
 
-    fn view_item_list<'a, T: std::fmt::Display + Clone + std::cmp::Eq>(
+    fn view_item_list<'a, T: Clone + std::cmp::Eq>(
         &self,
         config: ItemListConfig<'a, T>,
     ) -> Element<'a, Message> {
