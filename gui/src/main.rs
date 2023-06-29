@@ -1,3 +1,4 @@
+use config::AddOption;
 use iced::alignment::Horizontal;
 use serde_json;
 use std::path::Path;
@@ -6,11 +7,13 @@ use std::{fs, future};
 use iced::widget::{button, checkbox, column, container, pick_list, row, text, Column};
 use iced::{executor, Alignment, Application, Command, Element, Length, Settings, Theme};
 
-use generator::config::{BookConfig, FrontPage, Page, Preface, Song, TableOfContents};
+use generator::config::{BookConfig, FrontPage, Page, Preface, TableOfContents};
+
+mod config;
 
 #[derive(Debug, Default)]
 struct State {
-    book: generator::config::BookConfig,
+    book: BookConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +25,9 @@ pub enum Message {
     AddSong(String),
     MoveSong(usize, usize),
     RemoveSong(usize),
-    AddFrontPage(String),
+    AddFrontPage(Page),
+    MoveFrontPage(usize, usize),
+    RemoveFrontPage(usize),
 }
 
 #[must_use]
@@ -50,19 +55,6 @@ fn font_exists(font: &str) -> bool {
     return true;
 }
 
-struct ItemListConfig<'a, T>
-where
-    T: Clone,
-{
-    label: &'a str,
-    items: &'a [T],
-    render_item: Box<dyn Fn(&'a T) -> Element<'a, Message>>,
-    add_options: Vec<String>,
-    on_add: Box<dyn Fn(String) -> Message>,
-    on_move: Box<dyn Fn(usize, usize) -> Message>,
-    on_remove: Box<dyn Fn(usize) -> Message>,
-}
-
 fn get_available_songs() -> Vec<String> {
     let mut songs = Vec::new();
     for song in fs::read_dir("./songs").unwrap() {
@@ -82,14 +74,14 @@ impl Application for State {
     fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>) {
         // Load settings from file
         let mut book = match fs::read_to_string("settings.json") {
-            Ok(c) => match serde_json::from_str::<generator::config::BookConfig>(&c) {
+            Ok(c) => match serde_json::from_str::<BookConfig>(&c) {
                 Ok(b) => b,
                 Err(_) => {
                     fs::rename("settings.json", "settings.old.json").unwrap();
-                    generator::config::BookConfig::default()
+                    BookConfig::default()
                 }
             },
-            Err(_) => generator::config::BookConfig::default(),
+            Err(_) => BookConfig::default(),
         };
 
         // Make sure we have a valid font
@@ -165,26 +157,33 @@ impl Application for State {
                 ),
             ],
             vec![
-                self.view_item_list(ItemListConfig {
+                self.view_item_list(config::ItemListConfig {
                     label: "Songs",
                     items: &self.book.songs,
                     render_item: Box::new(|s| text(&s.title).into()),
-                    add_options: get_available_songs(),
+                    add_options: get_available_songs()
+                        .into_iter()
+                        .map(|s| AddOption::new(s.clone(), s))
+                        .collect(),
                     on_add: Box::new(|s| Message::AddSong(s)),
                     on_move: Box::new(|from, to| Message::MoveSong(from, to)),
                     on_remove: Box::new(|i| Message::RemoveSong(i)),
                 }),
-                self.view_item_list(ItemListConfig::<'a> {
+                self.view_item_list(config::ItemListConfig::<'a> {
                     label: "Front Pages",
                     items: &self.book.front_pages,
                     render_item: Box::new(|p| view_page(p)),
-                    add_options: ["preface", "tableofcontents", "frontpage"]
-                        .iter()
-                        .map(|f| (*f).to_owned())
-                        .collect(),
+                    add_options: vec![
+                        AddOption::new(
+                            "Efnisyfirlit".to_owned(),
+                            Page::TableOfContents(TableOfContents::default()),
+                        ),
+                        AddOption::new("Formáli".to_owned(), Page::Preface(Preface::default())),
+                        AddOption::new("Forsíða".to_owned(), Page::FrontPage(FrontPage::default())),
+                    ],
                     on_add: Box::new(|s| Message::AddFrontPage(s)),
-                    on_move: Box::new(|from, to| Message::MoveSong(from, to)),
-                    on_remove: Box::new(|i| Message::RemoveSong(i)),
+                    on_move: Box::new(|from, to| Message::MoveFrontPage(from, to)),
+                    on_remove: Box::new(|i| Message::RemoveFrontPage(i)),
                 }),
                 container(button(text("Generate")).on_press(Message::GeneratePdf))
                     .center_x()
@@ -203,16 +202,17 @@ impl Application for State {
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
             Message::AddFrontPage(page) => {
-                let page = match page.as_str() {
-                    "preface" => Page::Preface(Preface::default()),
-                    "tableofcontents" => Page::TableOfContents(TableOfContents::default()),
-                    "frontpage" => Page::FrontPage(FrontPage::default()),
-                    val => {
-                        println!("AddFrontPage called with some weird value: \"{}\"", val);
-                        return Command::none();
-                    }
-                };
                 self.book.front_pages.push(page);
+                write_settings()
+            }
+            Message::MoveFrontPage(from, to) => {
+                let elem = self.book.front_pages.remove(from);
+                let new_index = if to >= from { to - 1 } else { to };
+                self.book.front_pages.insert(new_index, elem);
+                write_settings()
+            }
+            Message::RemoveFrontPage(i) => {
+                self.book.front_pages.remove(i);
                 write_settings()
             }
             Message::AddSong(title) => {
@@ -329,11 +329,15 @@ impl State {
             .into()
     }
 
-    fn view_item_list<'a, T: Clone + std::cmp::Eq>(
+    fn view_item_list<'a, T, A>(
         &self,
-        config: ItemListConfig<'a, T>,
-    ) -> Element<'a, Message> {
-        let ItemListConfig {
+        config: config::ItemListConfig<'a, T, A>,
+    ) -> Element<'a, Message>
+    where
+        T: Clone + std::cmp::Eq,
+        A: Clone + std::cmp::Eq + 'static,
+    {
+        let config::ItemListConfig {
             label,
             items,
             render_item,
@@ -348,18 +352,21 @@ impl State {
         for (i, item) in items.iter().enumerate() {
             songs = songs.push(row![
                 container(render_item(item)).width(Length::Fill),
-                button("^").on_press(Message::MoveSong(i, i.saturating_sub(1))),
-                button("v").on_press(Message::MoveSong(i, i + 1)),
-                button("x").on_press(Message::RemoveSong(i)),
+                button("^").on_press(on_move(i, i.saturating_sub(1))),
+                button("v").on_press(on_move(i, i + 1)),
+                button("x").on_press(on_remove(i)),
             ]);
         }
 
         column![
             row![
                 text(label),
-                container(container(pick_list(add_options, None, on_add)).width(Length::Shrink))
-                    .align_x(Horizontal::Right)
-                    .width(Length::Fill),
+                container(
+                    container(pick_list(add_options, None, move |opt| on_add(opt.value)))
+                        .width(Length::Shrink)
+                )
+                .align_x(Horizontal::Right)
+                .width(Length::Fill),
             ],
             songs,
         ]
