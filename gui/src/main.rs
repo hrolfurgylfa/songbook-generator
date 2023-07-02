@@ -4,7 +4,7 @@ use serde_json;
 use std::path::Path;
 use std::{fs, future};
 
-use iced::widget::{button, checkbox, column, container, pick_list, row, text, Column};
+use iced::widget::{button, checkbox, column, container, pick_list, row, text, text_input, Column};
 use iced::{executor, Alignment, Application, Command, Element, Length, Settings, Theme};
 
 use generator::config::{BookConfig, FrontPage, Page, Preface, TableOfContents};
@@ -14,6 +14,12 @@ mod config;
 #[derive(Debug, Default)]
 struct State {
     book: BookConfig,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PageLoc {
+    Front,
+    Back,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +34,7 @@ pub enum Message {
     AddFrontPage(Page),
     MoveFrontPage(usize, usize),
     RemoveFrontPage(usize),
+    ChangePageTitle(PageLoc, usize, String),
 }
 
 #[must_use]
@@ -160,7 +167,7 @@ impl Application for State {
                 self.view_item_list(config::ItemListConfig {
                     label: "Songs",
                     items: &self.book.songs,
-                    render_item: Box::new(|s| text(&s.title).into()),
+                    render_item: Box::new(|_, s| text(&s.title).into()),
                     add_options: get_available_songs()
                         .into_iter()
                         .map(|s| AddOption::new(s.clone(), s))
@@ -172,7 +179,7 @@ impl Application for State {
                 self.view_item_list(config::ItemListConfig::<'a> {
                     label: "Front Pages",
                     items: &self.book.front_pages,
-                    render_item: Box::new(|p| view_page(p)),
+                    render_item: Box::new(|i, p| view_page(PageLoc::Front, i, p)),
                     add_options: vec![
                         AddOption::new(
                             "Efnisyfirlit".to_owned(),
@@ -201,6 +208,13 @@ impl Application for State {
 
     fn update(&mut self, message: Message) -> Command<Self::Message> {
         match message {
+            Message::ChangePageTitle(loc, i, new_name) => {
+                match loc {
+                    PageLoc::Front => change_page_name(&mut self.book.front_pages[i], new_name),
+                    PageLoc::Back => change_page_name(&mut self.book.back_pages[i], new_name),
+                };
+                write_settings()
+            }
             Message::AddFrontPage(page) => {
                 self.book.front_pages.push(page);
                 write_settings()
@@ -293,9 +307,28 @@ impl Application for State {
     }
 }
 
-fn view_page(page: &generator::config::Page) -> Element<Message> {
+fn change_page_name(page: &mut Page, new_name: String) {
     match page {
-        generator::config::Page::Preface(p) => text(&p.title).into(),
+        Page::Preface(p) => {
+            p.title = new_name;
+        }
+        Page::FrontPage(p) => {
+            p.title = new_name;
+        }
+        Page::TableOfContents(p) => {
+            p.title = new_name;
+        }
+    }
+}
+
+fn view_page(loc: PageLoc, i: usize, page: &generator::config::Page) -> Element<Message> {
+    match page {
+        generator::config::Page::Preface(p) => column![
+            text("Title:"),
+            text_input("Formáli", &p.title)
+                .on_input(move |title| Message::ChangePageTitle(loc, i, title)),
+        ]
+        .into(),
         generator::config::Page::TableOfContents(p) => text(&p.title).into(),
         generator::config::Page::FrontPage(p) => text(&p.title).into(),
     }
@@ -351,7 +384,7 @@ impl State {
 
         for (i, item) in items.iter().enumerate() {
             songs = songs.push(row![
-                container(render_item(item)).width(Length::Fill),
+                container(render_item(i, item)).width(Length::Fill),
                 button("^").on_press(on_move(i, i.saturating_sub(1))),
                 button("v").on_press(on_move(i, i + 1)),
                 button("x").on_press(on_remove(i)),

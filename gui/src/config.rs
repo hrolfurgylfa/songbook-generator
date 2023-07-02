@@ -25,7 +25,7 @@ where
 {
     pub label: &'a str,
     pub items: &'a [T],
-    pub render_item: Box<dyn Fn(&'a T) -> Element<'a, crate::Message>>,
+    pub render_item: Box<dyn Fn(usize, &'a T) -> Element<'a, crate::Message>>,
     pub add_options: Vec<AddOption<A>>,
     pub on_add: Box<dyn Fn(A) -> crate::Message>,
     pub on_move: Box<dyn Fn(usize, usize) -> crate::Message>,
