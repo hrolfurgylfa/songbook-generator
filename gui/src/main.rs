@@ -275,6 +275,10 @@ impl eframe::App for State {
             self.update_generate_panel(ctx, ui);
         });
     }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.write_settings();
+    }
 }
 
 fn add_to_page(book: &mut BookConfig, location: PageLocation, page: Page) {
