@@ -21,6 +21,16 @@ pub enum TableOfContentsSortOrder {
     SongNumber,
 }
 
+impl std::fmt::Display for TableOfContentsSortOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::SongNumber => "Laganúmer",
+            Self::Alphabetical => "Stafrófsröð",
+        };
+        write!(f, "{}", name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableOfContents {
     pub title: String,

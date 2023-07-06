@@ -3,7 +3,9 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 
-use generator::config::BookConfig;
+use generator::config::{
+    BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder,
+};
 
 use eframe::egui;
 
@@ -39,7 +41,10 @@ fn _get_available_songs() -> Vec<String> {
     songs
 }
 
-fn update_move_list<T: Clone>(ui: &mut egui::Ui, config: ItemListConfig<T>) -> egui::Response {
+fn update_move_list<T: Clone, A: FnOnce()>(
+    ui: &mut egui::Ui,
+    config: ItemListConfig<T, A>,
+) -> egui::Response {
     let mut written = false;
     let mut response = ui
         .vertical(|ui| {
@@ -53,9 +58,8 @@ fn update_move_list<T: Clone>(ui: &mut egui::Ui, config: ItemListConfig<T>) -> e
 
             ui.horizontal(|ui| {
                 ui.label(label);
-                if ui.button("Bæta við lagi").clicked() {
-                    items.extend(on_add(ui));
-                    written = true;
+                if ui.button("Bæta við").clicked() {
+                    on_add();
                 }
             });
 
@@ -136,9 +140,17 @@ impl WriteOnResponseChange for egui::Response {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum PageLocation {
+    Front,
+    Back,
+}
+
 #[derive(Debug, Default)]
 struct State {
     book: BookConfig,
+    add_song: bool,
+    add_page: Option<PageLocation>,
 }
 
 impl State {
@@ -173,13 +185,7 @@ impl eframe::App for State {
                     label: "Songs",
                     items: &mut self.book.songs,
                     render_item: Box::new(|ui, _, song| ui.label(&song.title)),
-                    on_add: Box::new(|_| match generator::load_song("Bakpokinn") {
-                        Ok(song) => vec![song],
-                        Err(e) => {
-                            println!("Failed to load song: {}", e);
-                            vec![]
-                        }
-                    }),
+                    on_add: Box::new(|| self.add_song = true),
                 },
             )
             .write(self);
@@ -188,8 +194,22 @@ impl eframe::App for State {
                 ItemListConfig {
                     label: "Framsíður",
                     items: &mut self.book.front_pages,
-                    render_item: Box::new(|ui, _, page| view_page(ui, page)),
-                    on_add: Box::new(|_| vec![]),
+                    render_item: Box::new(|ui, i, page| {
+                        ui.push_id(i, |ui| view_page(ui, page)).response
+                    }),
+                    on_add: Box::new(|| self.add_page = Some(PageLocation::Front)),
+                },
+            )
+            .write(self);
+            update_move_list(
+                ui,
+                ItemListConfig {
+                    label: "Baksíður",
+                    items: &mut self.book.back_pages,
+                    render_item: Box::new(|ui, i, page| {
+                        ui.push_id(i, |ui| view_page(ui, page)).response
+                    }),
+                    on_add: Box::new(|| self.add_page = Some(PageLocation::Back)),
                 },
             )
             .write(self);
@@ -197,7 +217,49 @@ impl eframe::App for State {
             if ui.button("Generate PDF").clicked() {
                 generate_pdf(&self.book);
             }
+
+            if self.add_song {
+                egui::Window::new("Add Song").show(ctx, |ui| {
+                    if ui.button("Hætta við").clicked() {
+                        self.add_song = false;
+                    }
+                });
+            }
+            if let Some(location) = self.add_page {
+                let window_title = match location {
+                    PageLocation::Front => "Bæta við forsíðu",
+                    PageLocation::Back => "Bæta við baksíðu",
+                };
+                egui::Window::new(window_title).show(ctx, |ui| {
+                    if ui.button("Hætta við").clicked() {
+                        self.add_page = None;
+                    }
+
+                    let options = [
+                        ("Forsíða", Page::FrontPage(FrontPage::default())),
+                        ("Formáli", Page::Preface(Preface::default())),
+                        (
+                            "Efnisyfirlit",
+                            Page::TableOfContents(TableOfContents::default()),
+                        ),
+                    ];
+                    for option in options {
+                        if ui.button(option.0).clicked() {
+                            add_to_page(&mut self.book, location, option.1);
+                            self.write_settings();
+                            self.add_page = None;
+                        }
+                    }
+                });
+            }
         });
+    }
+}
+
+fn add_to_page(book: &mut BookConfig, location: PageLocation, page: Page) {
+    match location {
+        PageLocation::Front => book.front_pages.push(page),
+        PageLocation::Back => book.back_pages.push(page),
     }
 }
 
@@ -211,6 +273,17 @@ fn view_page(ui: &mut egui::Ui, page: &mut generator::config::Page) -> egui::Res
         generator::config::Page::TableOfContents(p) => {
             ui.label("Efnisyfirlit");
             ui.text_edit_singleline(&mut p.title);
+            egui::ComboBox::from_label("Flokkunar röð")
+                .selected_text(format!("{}", p.order))
+                .show_ui(ui, |ui| {
+                    let sort_orders = [
+                        TableOfContentsSortOrder::SongNumber,
+                        TableOfContentsSortOrder::Alphabetical,
+                    ];
+                    for order in sort_orders {
+                        ui.selectable_value(&mut p.order, order, format!("{}", order));
+                    }
+                });
         }
         generator::config::Page::FrontPage(p) => {
             ui.label("Forsíða");
@@ -350,9 +423,13 @@ pub fn main() -> Result<(), eframe::Error> {
         initial_window_size: Some(egui::vec2(320.0, 240.0)),
         ..Default::default()
     };
+
+    let mut state = State::default();
+    state.book = load_book();
+
     eframe::run_native(
         "Skáta Söngbókin Þín",
         options,
-        Box::new(|_cc| Box::new(State { book: load_book() })),
+        Box::new(|_cc| Box::new(state)),
     )
 }
