@@ -3,8 +3,9 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 
-use generator::config::{
-    BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder,
+use generator::{
+    config::{BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder},
+    load_song,
 };
 
 use eframe::egui;
@@ -31,7 +32,7 @@ fn font_exists(font: &str) -> bool {
     return true;
 }
 
-fn _get_available_songs() -> Vec<String> {
+fn get_available_songs() -> Vec<String> {
     let mut songs = Vec::new();
     for song in fs::read_dir("./songs").unwrap() {
         let path = song.unwrap().path();
@@ -166,6 +167,8 @@ impl State {
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+
             ui.heading("Skáta Söngbókin Þín");
 
             ui.checkbox(&mut self.book.reorder_pages, "Reorder Pages for Printing")
@@ -219,11 +222,26 @@ impl eframe::App for State {
             }
 
             if self.add_song {
-                egui::Window::new("Add Song").show(ctx, |ui| {
-                    if ui.button("Hætta við").clicked() {
-                        self.add_song = false;
-                    }
-                });
+                egui::Window::new("Add Song")
+                    .scroll2([false, true])
+                    .show(ctx, |ui| {
+                        if ui.button("Hætta við").clicked() {
+                            self.add_song = false;
+                        }
+                        for song in get_available_songs() {
+                            if ui.button(&song).clicked() {
+                                self.add_song = false;
+                                match load_song(&song) {
+                                    Ok(song) => self.book.songs.push(song),
+                                    Err(err) => {
+                                        println!("Failed to load selected song: {}", err);
+                                        return;
+                                    }
+                                };
+                                self.write_settings();
+                            }
+                        }
+                    });
             }
             if let Some(location) = self.add_page {
                 let window_title = match location {
@@ -252,6 +270,7 @@ impl eframe::App for State {
                     }
                 });
             }
+        });
         });
     }
 }
