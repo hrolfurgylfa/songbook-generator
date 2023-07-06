@@ -162,13 +162,8 @@ impl State {
         )
         .unwrap();
     }
-}
-
-impl eframe::App for State {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-
+    fn update_generate_panel(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        egui::ScrollArea::vertical().show(ui, |ui| {
             ui.heading("Skáta Söngbókin Þín");
 
             ui.checkbox(&mut self.book.reorder_pages, "Reorder Pages for Printing")
@@ -271,6 +266,13 @@ impl eframe::App for State {
                 });
             }
         });
+    }
+}
+
+impl eframe::App for State {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.update_generate_panel(ctx, ui);
         });
     }
 }
