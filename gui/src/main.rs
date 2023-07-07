@@ -42,10 +42,13 @@ fn get_available_songs() -> Vec<String> {
     songs
 }
 
-fn update_move_list<T: Clone, A: FnOnce()>(
+fn update_move_list<T: Clone, A: FnOnce(), B>(
     ui: &mut egui::Ui,
-    config: ItemListConfig<T, A>,
-) -> egui::Response {
+    config: ItemListConfig<T, A, B>,
+) -> egui::Response
+where
+    B: Fn(&mut egui::Ui, usize, &mut T) -> egui::Response,
+{
     let mut written = false;
     let mut response = ui
         .vertical(|ui| {
@@ -189,8 +192,8 @@ impl State {
                 ItemListConfig {
                     label: "Songs",
                     items: &mut self.book.songs,
-                    render_item: Box::new(|ui, _, song| ui.label(&song.title)),
-                    on_add: Box::new(|| self.add_song = true),
+                    render_item: |ui, _, song| ui.label(&song.title),
+                    on_add: || self.add_song = true,
                 },
             )
             .write(self);
@@ -199,11 +202,11 @@ impl State {
                 ItemListConfig {
                     label: "Framsíður",
                     items: &mut self.book.front_pages,
-                    render_item: Box::new(|ui, i, page| {
+                    render_item: |ui, i, page| {
                         ui.push_id(format!("f_{}", i), |ui| view_page(ui, page))
                             .response
-                    }),
-                    on_add: Box::new(|| self.add_page = Some(PageLocation::Front)),
+                    },
+                    on_add: || self.add_page = Some(PageLocation::Front),
                 },
             )
             .write(self);
@@ -212,11 +215,11 @@ impl State {
                 ItemListConfig {
                     label: "Baksíður",
                     items: &mut self.book.back_pages,
-                    render_item: Box::new(|ui, i, page| {
+                    render_item: |ui, i, page| {
                         ui.push_id(format!("b_{}", i), |ui| view_page(ui, page))
                             .response
-                    }),
-                    on_add: Box::new(|| self.add_page = Some(PageLocation::Back)),
+                    },
+                    on_add: || self.add_page = Some(PageLocation::Back),
                 },
             )
             .write(self);
