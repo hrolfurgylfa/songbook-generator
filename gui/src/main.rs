@@ -57,41 +57,48 @@ fn update_move_list<T: Clone, A: FnOnce()>(
             } = config;
             let items_len = items.len();
 
-            ui.horizontal(|ui| {
-                ui.label(label);
-                if ui.button("Bæta við").clicked() {
-                    on_add();
-                }
-            });
-
-            for i in 0..items_len {
-                ui.horizontal(|ui| {
-                    let song = match items.get_mut(i) {
-                        Some(i) => i,
-                        None => return,
-                    };
-                    render_item(ui, i, song);
-                    if ui.button("^").clicked() {
-                        println!("Move song up: {}", i);
-                        if i != 0 {
-                            items.swap(i, i - 1);
-                            written = true;
-                        }
-                    }
-                    if ui.button("v").clicked() {
-                        println!("Move song down: {}", i);
-                        if i + 1 < items.len() {
-                            items.swap(i, i + 1);
-                            written = true;
-                        }
-                    }
-                    if ui.button("x").clicked() {
-                        println!("Remove song: {}", i);
-                        items.remove(i);
-                        written = true;
+            ui.add_space(12.0);
+            egui::Grid::new(format!("move_list_{}_heading", config.label))
+                .num_columns(2)
+                .spacing([40.0, 4.0])
+                .show(ui, |ui| {
+                    ui.heading(label);
+                    if ui.button("Bæta við").clicked() {
+                        on_add();
                     }
                 });
-            }
+
+            egui::Grid::new(format!("move_list_{}", config.label))
+                .num_columns(4)
+                .spacing([1.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    for i in 0..items_len {
+                        let song = match items.get_mut(i) {
+                            Some(i) => i,
+                            None => return,
+                        };
+                        render_item(ui, i, song);
+
+                        if ui.button("Upp").clicked() {
+                            if i != 0 {
+                                items.swap(i, i - 1);
+                                written = true;
+                            }
+                        }
+                        if ui.button("Niður").clicked() {
+                            if i + 1 < items.len() {
+                                items.swap(i, i + 1);
+                                written = true;
+                            }
+                        }
+                        if ui.button("Eyða").clicked() {
+                            items.remove(i);
+                            written = true;
+                        }
+                        ui.end_row();
+                    }
+                });
         })
         .response;
     if written {
@@ -289,31 +296,34 @@ fn add_to_page(book: &mut BookConfig, location: PageLocation, page: Page) {
 }
 
 fn view_page(ui: &mut egui::Ui, page: &mut generator::config::Page) -> egui::Response {
-    ui.vertical(|ui| match page {
-        generator::config::Page::Preface(p) => {
-            ui.label("Formáli");
-            ui.text_edit_singleline(&mut p.title);
-            ui.text_edit_multiline(&mut p.body);
-        }
-        generator::config::Page::TableOfContents(p) => {
-            ui.label("Efnisyfirlit");
-            ui.text_edit_singleline(&mut p.title);
-            egui::ComboBox::from_label("Flokkunar röð")
-                .selected_text(format!("{}", p.order))
-                .show_ui(ui, |ui| {
-                    let sort_orders = [
-                        TableOfContentsSortOrder::SongNumber,
-                        TableOfContentsSortOrder::Alphabetical,
-                    ];
-                    for order in sort_orders {
-                        ui.selectable_value(&mut p.order, order, format!("{}", order));
-                    }
-                });
-        }
-        generator::config::Page::FrontPage(p) => {
-            ui.label("Forsíða");
-            ui.text_edit_singleline(&mut p.title);
-            ui.text_edit_singleline(&mut p.version);
+    ui.vertical(|ui| {
+        ui.set_min_size(egui::vec2(200.0, 4.0));
+        match page {
+            generator::config::Page::Preface(p) => {
+                ui.label("Formáli");
+                ui.text_edit_singleline(&mut p.title);
+                ui.text_edit_multiline(&mut p.body);
+            }
+            generator::config::Page::TableOfContents(p) => {
+                ui.label("Efnisyfirlit");
+                ui.text_edit_singleline(&mut p.title);
+                egui::ComboBox::from_label("Flokkunar röð")
+                    .selected_text(format!("{}", p.order))
+                    .show_ui(ui, |ui| {
+                        let sort_orders = [
+                            TableOfContentsSortOrder::SongNumber,
+                            TableOfContentsSortOrder::Alphabetical,
+                        ];
+                        for order in sort_orders {
+                            ui.selectable_value(&mut p.order, order, format!("{}", order));
+                        }
+                    });
+            }
+            generator::config::Page::FrontPage(p) => {
+                ui.label("Forsíða");
+                ui.text_edit_singleline(&mut p.title);
+                ui.text_edit_singleline(&mut p.version);
+            }
         }
     })
     .response
