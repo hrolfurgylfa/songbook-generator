@@ -200,7 +200,8 @@ impl State {
                     label: "Framsíður",
                     items: &mut self.book.front_pages,
                     render_item: Box::new(|ui, i, page| {
-                        ui.push_id(i, |ui| view_page(ui, page)).response
+                        ui.push_id(format!("f_{}", i), |ui| view_page(ui, page))
+                            .response
                     }),
                     on_add: Box::new(|| self.add_page = Some(PageLocation::Front)),
                 },
@@ -212,7 +213,8 @@ impl State {
                     label: "Baksíður",
                     items: &mut self.book.back_pages,
                     render_item: Box::new(|ui, i, page| {
-                        ui.push_id(i, |ui| view_page(ui, page)).response
+                        ui.push_id(format!("b_{}", i), |ui| view_page(ui, page))
+                            .response
                     }),
                     on_add: Box::new(|| self.add_page = Some(PageLocation::Back)),
                 },
