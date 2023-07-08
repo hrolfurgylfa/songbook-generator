@@ -12,74 +12,6 @@ mod config;
 mod elements;
 mod helpers;
 
-fn update_move_list<T: Clone, A: FnOnce(), B>(
-    ui: &mut egui::Ui,
-    config: ItemListConfig<T, A, B>,
-) -> egui::Response
-where
-    B: Fn(&mut egui::Ui, usize, &mut T) -> egui::Response,
-{
-    let mut written = false;
-    let mut response = ui
-        .vertical(|ui| {
-            let ItemListConfig {
-                label,
-                items,
-                render_item,
-                on_add,
-            } = config;
-            let items_len = items.len();
-
-            ui.add_space(12.0);
-            egui::Grid::new(format!("move_list_{}_heading", config.label))
-                .num_columns(2)
-                .spacing([40.0, 4.0])
-                .show(ui, |ui| {
-                    ui.heading(label);
-                    if ui.button("Bæta við").clicked() {
-                        on_add();
-                    }
-                });
-
-            egui::Grid::new(format!("move_list_{}", config.label))
-                .num_columns(4)
-                .spacing([1.0, 4.0])
-                .striped(true)
-                .show(ui, |ui| {
-                    for i in 0..items_len {
-                        let song = match items.get_mut(i) {
-                            Some(i) => i,
-                            None => return,
-                        };
-                        render_item(ui, i, song);
-
-                        if ui.button("Upp").clicked() {
-                            if i != 0 {
-                                items.swap(i, i - 1);
-                                written = true;
-                            }
-                        }
-                        if ui.button("Niður").clicked() {
-                            if i + 1 < items.len() {
-                                items.swap(i, i + 1);
-                                written = true;
-                            }
-                        }
-                        if ui.button("Eyða").clicked() {
-                            items.remove(i);
-                            written = true;
-                        }
-                        ui.end_row();
-                    }
-                });
-        })
-        .response;
-    if written {
-        response.mark_changed();
-    }
-    response
-}
-
 trait WriteOnResponseChange {
     fn write(&self, state: &State);
 }
@@ -266,6 +198,74 @@ fn view_page(ui: &mut egui::Ui, page: &mut generator::config::Page) -> egui::Res
         }
     })
     .response
+}
+
+fn update_move_list<T: Clone, A: FnOnce(), B>(
+    ui: &mut egui::Ui,
+    config: ItemListConfig<T, A, B>,
+) -> egui::Response
+where
+    B: Fn(&mut egui::Ui, usize, &mut T) -> egui::Response,
+{
+    let mut written = false;
+    let mut response = ui
+        .vertical(|ui| {
+            let ItemListConfig {
+                label,
+                items,
+                render_item,
+                on_add,
+            } = config;
+            let items_len = items.len();
+
+            ui.add_space(12.0);
+            egui::Grid::new(format!("move_list_{}_heading", config.label))
+                .num_columns(2)
+                .spacing([40.0, 4.0])
+                .show(ui, |ui| {
+                    ui.heading(label);
+                    if ui.button("Bæta við").clicked() {
+                        on_add();
+                    }
+                });
+
+            egui::Grid::new(format!("move_list_{}", config.label))
+                .num_columns(4)
+                .spacing([1.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    for i in 0..items_len {
+                        let song = match items.get_mut(i) {
+                            Some(i) => i,
+                            None => return,
+                        };
+                        render_item(ui, i, song);
+
+                        if ui.button("Upp").clicked() {
+                            if i != 0 {
+                                items.swap(i, i - 1);
+                                written = true;
+                            }
+                        }
+                        if ui.button("Niður").clicked() {
+                            if i + 1 < items.len() {
+                                items.swap(i, i + 1);
+                                written = true;
+                            }
+                        }
+                        if ui.button("Eyða").clicked() {
+                            items.remove(i);
+                            written = true;
+                        }
+                        ui.end_row();
+                    }
+                });
+        })
+        .response;
+    if written {
+        response.mark_changed();
+    }
+    response
 }
 
 pub fn main() -> Result<(), eframe::Error> {
