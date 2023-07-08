@@ -1,15 +1,16 @@
+use add_song::AddSong;
 use config::ItemListConfig;
 use serde_json;
 use std::fs;
 use std::path::Path;
 
-use generator::{
-    config::{BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder},
-    load_song,
+use generator::config::{
+    BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder,
 };
 
 use eframe::egui;
 
+mod add_song;
 mod config;
 
 const AVAILABLE_FONTS: [&str; 2] = ["Roboto", "RobotoStripped"];
@@ -30,16 +31,6 @@ fn font_exists(font: &str) -> bool {
     }
 
     return true;
-}
-
-fn get_available_songs() -> Vec<String> {
-    let mut songs = Vec::new();
-    for song in fs::read_dir("./songs").unwrap() {
-        let path = song.unwrap().path();
-        let title = path.file_stem().unwrap();
-        songs.push(title.to_string_lossy().into_owned());
-    }
-    songs
 }
 
 fn update_move_list<T: Clone, A: FnOnce(), B>(
@@ -160,7 +151,7 @@ enum PageLocation {
 #[derive(Debug, Default)]
 struct State {
     book: BookConfig,
-    add_song: bool,
+    add_song: AddSong,
     add_page: Option<PageLocation>,
 }
 
@@ -190,10 +181,10 @@ impl State {
             update_move_list(
                 ui,
                 ItemListConfig {
-                    label: "Songs",
+                    label: "Lög",
                     items: &mut self.book.songs,
                     render_item: |ui, _, song| ui.label(&song.title),
-                    on_add: || self.add_song = true,
+                    on_add: || self.add_song.open(),
                 },
             )
             .write(self);
@@ -228,27 +219,9 @@ impl State {
                 generate_pdf(&self.book);
             }
 
-            if self.add_song {
-                egui::Window::new("Add Song")
-                    .scroll2([false, true])
-                    .show(ctx, |ui| {
-                        if ui.button("Hætta við").clicked() {
-                            self.add_song = false;
-                        }
-                        for song in get_available_songs() {
-                            if ui.button(&song).clicked() {
-                                self.add_song = false;
-                                match load_song(&song) {
-                                    Ok(song) => self.book.songs.push(song),
-                                    Err(err) => {
-                                        println!("Failed to load selected song: {}", err);
-                                        return;
-                                    }
-                                };
-                                self.write_settings();
-                            }
-                        }
-                    });
+            if let Some(song) = self.add_song.ui(ui) {
+                self.book.songs.push(song);
+                self.write_settings();
             }
             if let Some(location) = self.add_page {
                 let window_title = match location {
