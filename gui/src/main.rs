@@ -1,7 +1,6 @@
 use config::ItemListConfig;
 use serde_json;
 use std::fs;
-use std::path::Path;
 
 use generator::config::{
     BookConfig, FrontPage, Page, Preface, TableOfContents, TableOfContentsSortOrder,
@@ -11,26 +10,7 @@ use eframe::egui;
 
 mod config;
 mod elements;
-
-const AVAILABLE_FONTS: [&str; 2] = ["Roboto", "RobotoStripped"];
-const DEFAULT_FONT: &str = "RobotoStripped";
-
-fn font_exists(font: &str) -> bool {
-    for style in ["Regular", "Italic", "Bold", "BoldItalic"].iter() {
-        let path_str = format!("./fonts/{}/{}-{}.ttf", font, font, style);
-        let path = Path::new(&path_str);
-        if !path.exists() {
-            println!(
-                "Font \"{}\" not found; font file \"{}\" does not exist",
-                font,
-                path.display()
-            );
-            return false;
-        }
-    }
-
-    return true;
-}
+mod helpers;
 
 fn update_move_list<T: Clone, A: FnOnce(), B>(
     ui: &mut egui::Ui,
@@ -98,35 +78,6 @@ where
         response.mark_changed();
     }
     response
-}
-
-fn generate_pdf(book: &BookConfig) {
-    // Make sure we have some pages to generate
-    if book.songs.is_empty() && book.front_pages.is_empty() && book.back_pages.is_empty() {
-        println!("No songs or pages to generate!");
-        return;
-    }
-
-    // Generate the songbook PDF
-    let pdf = match generator::generate_book_pdf(&book) {
-        Ok(pdf) => pdf,
-        Err(e) => {
-            println!("Error generating PDF: {}", e);
-            return;
-        }
-    };
-
-    // Write the PDF to disk
-    match fs::write("book.pdf", pdf) {
-        Ok(_) => {}
-        Err(e) => println!("Error writing PDF: {}", e),
-    };
-
-    // Open the PDF
-    match open::that("book.pdf") {
-        Ok(_) => {}
-        Err(e) => println!("Error opening PDF: {}", e),
-    };
 }
 
 trait WriteOnResponseChange {
@@ -264,7 +215,7 @@ impl eframe::App for State {
                     });
                     ui.centered_and_justified(|ui| {
                         if ui.button("Búa til PDF").clicked() {
-                            generate_pdf(&self.book);
+                            helpers::generate_pdf(&self.book);
                         }
                     });
                 });
@@ -321,56 +272,6 @@ fn view_page(ui: &mut egui::Ui, page: &mut generator::config::Page) -> egui::Res
     .response
 }
 
-fn load_book() -> BookConfig {
-    // Load settings from file
-    let mut book = match fs::read_to_string("settings.json") {
-        Ok(c) => match serde_json::from_str::<BookConfig>(&c) {
-            Ok(b) => b,
-            Err(_) => {
-                fs::rename("settings.json", "settings.old.json").unwrap();
-                BookConfig::default()
-            }
-        },
-        Err(_) => BookConfig::default(),
-    };
-
-    // Make sure we have a valid font
-    if !font_exists(&book.preferred_font) {
-        let old_font = book.preferred_font.clone();
-        book.preferred_font = DEFAULT_FONT.to_owned();
-        println!(
-            "Font \"{}\" not found; using default font {}",
-            old_font, DEFAULT_FONT
-        );
-    }
-
-    // Add the song bodies, and remove any that can't be found
-    book.songs = book
-        .songs
-        .into_iter()
-        .filter_map(|s| match generator::load_song(&s.title) {
-            Ok(s) => Some(s),
-            Err(e) => {
-                println!(
-                    "Failed to find song \"{}\": {}. Removing it from the current songbook",
-                    s.title, e
-                );
-                None
-            }
-        })
-        .collect();
-
-    // Save, in case we had to change the file while loading
-    fs::write(
-        "settings.json",
-        serde_json::to_string_pretty(&book).unwrap(),
-    )
-    .unwrap();
-
-    // Start the program
-    book
-}
-
 pub fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
@@ -380,7 +281,7 @@ pub fn main() -> Result<(), eframe::Error> {
     };
 
     let mut state = State::default();
-    state.book = load_book();
+    state.book = helpers::load_book();
 
     eframe::run_native(
         "Skáta Söngbókin Þín",
