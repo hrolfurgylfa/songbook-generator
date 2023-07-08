@@ -165,19 +165,6 @@ impl State {
     }
     fn update_generate_panel(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
-            ui.heading("Skáta Söngbókin Þín");
-
-            ui.checkbox(&mut self.book.reorder_pages, "Reorder Pages for Printing")
-                .write(self);
-            egui::ComboBox::from_label("Preferred Font")
-                .selected_text(format!("{}", self.book.preferred_font))
-                .show_ui(ui, |ui| {
-                    for font in AVAILABLE_FONTS {
-                        ui.selectable_value(&mut self.book.preferred_font, font.to_owned(), font);
-                    }
-                })
-                .response
-                .write(self);
             update_move_list(
                 ui,
                 ItemListConfig {
@@ -214,10 +201,6 @@ impl State {
                 },
             )
             .write(self);
-
-            if ui.button("Generate PDF").clicked() {
-                generate_pdf(&self.book);
-            }
 
             if let Some(song) = self.add_song.ui(ui) {
                 self.book.songs.push(song);
@@ -256,6 +239,47 @@ impl State {
 
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::SidePanel::new(egui::panel::Side::Left, "presets_panel")
+            .min_width(200.0)
+            .show(ctx, |ui| {
+                ui.heading("Þínar Bækur");
+                ui.heading("Standard Bækur");
+            });
+        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "generate_panel")
+            .min_height(8.0)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        egui::Grid::new("gen_settings").show(ui, |ui| {
+                            ui.label("Endurraða síðum");
+                            ui.checkbox(&mut self.book.reorder_pages, "").write(self);
+                            ui.end_row();
+
+                            ui.label("Leturgerð");
+                            egui::ComboBox::from_label("")
+                                .selected_text(format!("{}", self.book.preferred_font))
+                                .show_ui(ui, |ui| {
+                                    for font in AVAILABLE_FONTS {
+                                        ui.selectable_value(
+                                            &mut self.book.preferred_font,
+                                            font.to_owned(),
+                                            font,
+                                        );
+                                    }
+                                })
+                                .response
+                                .write(self);
+                            ui.end_row();
+                        });
+                    });
+                    ui.centered_and_justified(|ui| {
+                        if ui.button("Búa til PDF").clicked() {
+                            generate_pdf(&self.book);
+                        }
+                    });
+                });
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             self.update_generate_panel(ctx, ui);
         });
@@ -360,7 +384,8 @@ fn load_book() -> BookConfig {
 pub fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(320.0, 240.0)),
+        initial_window_size: Some(egui::vec2(640.0, 640.0)),
+        min_window_size: Some(egui::vec2(640.0, 640.0)),
         ..Default::default()
     };
 
