@@ -152,6 +152,7 @@ struct State {
     book: BookConfig,
     add_song: elements::AddSong,
     add_page: Option<PageLocation>,
+    select_font: elements::SelectFont,
 }
 
 impl State {
@@ -255,18 +256,8 @@ impl eframe::App for State {
                             ui.end_row();
 
                             ui.label("Leturgerð");
-                            egui::ComboBox::from_label("")
-                                .selected_text(format!("{}", self.book.preferred_font))
-                                .show_ui(ui, |ui| {
-                                    for font in AVAILABLE_FONTS {
-                                        ui.selectable_value(
-                                            &mut self.book.preferred_font,
-                                            font.to_owned(),
-                                            font,
-                                        );
-                                    }
-                                })
-                                .response
+                            self.select_font
+                                .ui(ui, &mut self.book.preferred_font)
                                 .write(self);
                             ui.end_row();
                         });
