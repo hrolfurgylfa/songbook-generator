@@ -175,9 +175,12 @@ impl State {
                             Page::TableOfContents(TableOfContents::default()),
                         ),
                     ];
-                    for option in options {
-                        if ui.button(option.0).clicked() {
-                            add_to_page(&mut self.book, location, option.1);
+                    for (label, page) in options {
+                        if ui.button(label).clicked() {
+                            match location {
+                                PageLocation::Front => self.book.front_pages.push(page),
+                                PageLocation::Back => self.book.back_pages.push(page),
+                            }
                             self.write_settings();
                             self.add_page = None;
                         }
@@ -228,13 +231,6 @@ impl eframe::App for State {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.write_settings();
-    }
-}
-
-fn add_to_page(book: &mut BookConfig, location: PageLocation, page: Page) {
-    match location {
-        PageLocation::Front => book.front_pages.push(page),
-        PageLocation::Back => book.back_pages.push(page),
     }
 }
 
