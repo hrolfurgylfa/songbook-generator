@@ -1,4 +1,3 @@
-use add_song::AddSong;
 use config::ItemListConfig;
 use serde_json;
 use std::fs;
@@ -10,8 +9,8 @@ use generator::config::{
 
 use eframe::egui;
 
-mod add_song;
 mod config;
+mod elements;
 
 const AVAILABLE_FONTS: [&str; 2] = ["Roboto", "RobotoStripped"];
 const DEFAULT_FONT: &str = "RobotoStripped";
@@ -151,7 +150,7 @@ enum PageLocation {
 #[derive(Debug, Default)]
 struct State {
     book: BookConfig,
-    add_song: AddSong,
+    add_song: elements::AddSong,
     add_page: Option<PageLocation>,
 }
 
