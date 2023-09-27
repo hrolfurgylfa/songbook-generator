@@ -14,3 +14,7 @@ pdfium-render = "0.8.5"
 genpdf = { path = "../genpdf-rs-patched" }
 
 wasm-bindgen = "0.2"
+
+[dependencies.windows]
+version = "0.51"
+features = ["Win32_Foundation", "Win32_Graphics_DirectWrite"]

@@ -4,20 +4,15 @@ use genpdf::{elements, fonts, style};
 
 use crate::config::TableOfContentsSortOrder;
 use crate::config::{FrontPage, Page, Preface, Song, TableOfContents};
+use crate::fonts::FontError;
 
 const TITLE_FONT_SIZE: u8 = 36;
 const SONG_TITLE_FONT_SIZE: u8 = 28;
 const BODY_FONT_SIZE: u8 = 24;
 
 type Font = fonts::FontFamily<fonts::FontData>;
-pub fn load_font(font_name: &str) -> Font {
-    // let font_dir = FONT_DIRS
-    //     .iter()
-    //     .filter(|path| std::path::Path::new(path).exists())
-    //     .next()
-    //     .expect("Could not find font directory");
-    return fonts::from_files(format!("./fonts/{}/", font_name), font_name, None)
-        .expect("Failed to load the default font family");
+pub fn load_font(font_name: &str) -> Result<Font, FontError> {
+    crate::fonts::get_font(font_name)
 }
 
 fn get_empty_pdf(font: &Font) -> genpdf::Document {

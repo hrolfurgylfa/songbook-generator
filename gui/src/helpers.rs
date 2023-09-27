@@ -1,24 +1,14 @@
-use std::{fs, path::Path};
+use std::fs;
 
 use generator::config::BookConfig;
 
-const DEFAULT_FONT: &str = "RobotoStripped";
+const DEFAULT_FONT: &str = "Arial";
 
 pub fn font_exists(font: &str) -> bool {
-    for style in ["Regular", "Italic", "Bold", "BoldItalic"].iter() {
-        let path_str = format!("./fonts/{}/{}-{}.ttf", font, font, style);
-        let path = Path::new(&path_str);
-        if !path.exists() {
-            println!(
-                "Font \"{}\" not found; font file \"{}\" does not exist",
-                font,
-                path.display()
-            );
-            return false;
-        }
-    }
-
-    return true;
+    return generator::fonts::get_fonts()
+        .unwrap()
+        .iter()
+        .any(|f| f == font);
 }
 
 pub fn load_book() -> BookConfig {

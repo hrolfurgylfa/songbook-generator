@@ -1,14 +1,44 @@
 pub mod config;
+pub mod fonts;
 pub mod gen_pdfs;
 pub mod tile;
 
-use std::fs;
+use std::{fmt::Display, fs};
 
+use fonts::FontError;
 use pdfium_render::prelude::{Pdfium, PdfiumError};
 use wasm_bindgen::prelude::*;
 
-pub fn generate_book_pdfs(config: &config::BookConfig) -> Vec<Vec<u8>> {
-    let font = gen_pdfs::load_font(&config.preferred_font);
+#[derive(Debug)]
+pub enum GenerationError {
+    PdfiumError(PdfiumError),
+    FontError(FontError),
+}
+
+impl From<PdfiumError> for GenerationError {
+    fn from(value: PdfiumError) -> Self {
+        Self::PdfiumError(value)
+    }
+}
+
+impl From<FontError> for GenerationError {
+    fn from(value: FontError) -> Self {
+        Self::FontError(value)
+    }
+}
+
+impl Display for GenerationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GenerationError::")?;
+        match self {
+            Self::PdfiumError(e) => write!(f, "PdfiumError({})", e),
+            Self::FontError(e) => write!(f, "FontError({})", e),
+        }
+    }
+}
+
+pub fn generate_book_pdfs(config: &config::BookConfig) -> Result<Vec<Vec<u8>>, FontError> {
+    let font = gen_pdfs::load_font(&config.preferred_font)?;
     let mut pdfs = Vec::with_capacity(
         config.front_pages.len()
             + config.back_pages.len()
@@ -28,11 +58,11 @@ pub fn generate_book_pdfs(config: &config::BookConfig) -> Vec<Vec<u8>> {
         pdfs.push(gen_pdfs::generate_page(&font, &config.songs, page));
     }
 
-    return pdfs;
+    return Ok(pdfs);
 }
 
-pub fn generate_book_pdf(config: &config::BookConfig) -> Result<Vec<u8>, PdfiumError> {
-    let pdfs = generate_book_pdfs(&config);
+pub fn generate_book_pdf(config: &config::BookConfig) -> Result<Vec<u8>, GenerationError> {
+    let pdfs = generate_book_pdfs(&config)?;
 
     #[cfg(target_family = "wasm")]
     let pdfium = Pdfium::new(Pdfium::bind_to_system_library()?);
