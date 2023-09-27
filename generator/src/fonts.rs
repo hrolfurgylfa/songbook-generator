@@ -3,11 +3,16 @@ use std::{ffi::OsStr, fmt, iter::repeat, os::windows::prelude::OsStrExt};
 use genpdf::fonts::{FontData, FontFamily};
 use windows::{
     core::PCWSTR,
-    Win32::Graphics::DirectWrite::{
-        DWriteCreateFactory, IDWriteFactory, IDWriteFont, IDWriteFontCollection,
-        IDWriteLocalizedStrings, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FACE_TYPE,
-        DWRITE_FONT_FILE_TYPE, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_ITALIC,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL,
+    Win32::{
+        Foundation::BOOL,
+        Globalization::GetUserDefaultLocaleName,
+        Graphics::DirectWrite::{
+            DWriteCreateFactory, IDWriteFactory, IDWriteFont, IDWriteFontCollection,
+            IDWriteLocalizedStrings, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FACE_TYPE,
+            DWRITE_FONT_FILE_TYPE, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_ITALIC,
+            DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL,
+        },
+        System::SystemServices::LOCALE_NAME_MAX_LENGTH,
     },
 };
 
@@ -90,13 +95,33 @@ fn get_system_font_collection(check_for_updates: bool) -> Result<IDWriteFontColl
 }
 
 fn localize_string(strings: IDWriteLocalizedStrings) -> Result<String, FontError> {
-    // TODO: Get the region correct name
-    let index = 0;
-    // let mut exists = false.into();
-    // names
-    //     .FindLocaleName(to_pcwstr("en_us"), &mut index, &mut exists)
-    //     .unwrap();
-    // assert!(exists.0 == true);
+    // Get the region correct name
+    let mut index = 0;
+    let mut exists: BOOL = false.into();
+    unsafe {
+        // Get the OS default locale
+        let mut default_locale_name = repeat(0)
+            .take(LOCALE_NAME_MAX_LENGTH as usize + 1)
+            .collect::<Vec<u16>>();
+        let success = GetUserDefaultLocaleName(&mut default_locale_name);
+        if success != 0 {
+            strings.FindLocaleName(
+                PCWSTR::from_raw(default_locale_name.as_ptr()),
+                &mut index,
+                &mut exists,
+            )?;
+        }
+
+        // Get the english locale
+        if exists.0 == 0 {
+            strings.FindLocaleName(to_pcwstr("en_us"), &mut index, &mut exists)?;
+        }
+    }
+
+    // Get the first one if no locales were found
+    if exists.0 == 0 {
+        index = 0;
+    }
 
     // Move string of index into return value
     let length = unsafe { strings.GetStringLength(index) }

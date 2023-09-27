@@ -17,4 +17,9 @@ wasm-bindgen = "0.2"
 
 [dependencies.windows]
 version = "0.51"
-features = ["Win32_Foundation", "Win32_Graphics_DirectWrite"]
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Globalization",
+    "Win32_System_SystemServices",
+]
