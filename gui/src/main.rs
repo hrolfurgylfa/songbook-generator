@@ -47,7 +47,8 @@ impl State {
         .unwrap();
     }
     fn update_generate_panel(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        let scroll_area = egui::ScrollArea::vertical().auto_shrink([false, false]);
+        scroll_area.show(ui, |ui| {
             update_move_list(
                 ui,
                 ItemListConfig {
@@ -200,11 +201,10 @@ fn view_page(ui: &mut egui::Ui, page: &mut generator::config::Page) -> egui::Res
     .response
 }
 
-fn update_move_list<T: Clone, A: FnOnce(), B>(
-    ui: &mut egui::Ui,
-    config: ItemListConfig<T, A, B>,
-) -> egui::Response
+fn update_move_list<T, A, B>(ui: &mut egui::Ui, config: ItemListConfig<T, A, B>) -> egui::Response
 where
+    T: Clone,
+    A: FnOnce(),
     B: Fn(&mut egui::Ui, usize, &mut T) -> egui::Response,
 {
     let mut written = false;
