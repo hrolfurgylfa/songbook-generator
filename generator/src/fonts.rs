@@ -9,8 +9,9 @@ use windows::{
         Graphics::DirectWrite::{
             DWriteCreateFactory, IDWriteFactory, IDWriteFont, IDWriteFontCollection,
             IDWriteLocalizedStrings, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_FACE_TYPE,
-            DWRITE_FONT_FILE_TYPE, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_ITALIC,
-            DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_FILE_TYPE, DWRITE_FONT_FILE_TYPE_TRUETYPE, DWRITE_FONT_STRETCH_NORMAL,
+            DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_BOLD,
+            DWRITE_FONT_WEIGHT_NORMAL,
         },
         System::SystemServices::LOCALE_NAME_MAX_LENGTH,
     },
@@ -180,6 +181,13 @@ fn get_font_data(font: IDWriteFont) -> Result<Vec<u8>, FontError> {
             Some(&mut face_type),
             &mut num_faces,
         )?;
+        if file_type != DWRITE_FONT_FILE_TYPE_TRUETYPE {
+            return Err(FontError::new_msg_only(format!(
+                "Failed to use non-TrueType font, it is type {:?}. Please select another font.",
+                file_type
+            )));
+        }
+
         let mut reference_key: *mut std::ffi::c_void = std::ptr::null_mut();
         let mut reference_key_size = 0;
         file.GetReferenceKey(&mut reference_key, &mut reference_key_size)?;
