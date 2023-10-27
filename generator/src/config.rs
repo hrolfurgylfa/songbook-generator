@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::tile;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preface {
     pub title: String,
@@ -81,11 +83,44 @@ impl std::fmt::Display for Song {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+fn default_padding() -> u8 {
+    10
+}
+
+fn default_add_separator() -> bool {
+    true
+}
+
+fn default_tiled_page_size() -> tile::PageSize {
+    tile::PageSize::A7
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BookConfig {
     pub front_pages: Vec<Page>,
     pub back_pages: Vec<Page>,
     pub songs: Vec<Song>,
     pub preferred_font: String,
     pub reorder_pages: bool,
+    #[serde(default = "default_padding")]
+    pub padding: u8,
+    #[serde(default = "default_add_separator")]
+    pub add_separator: bool,
+    #[serde(default = "default_tiled_page_size")]
+    pub tiled_page_size: tile::PageSize,
+}
+
+impl Default for BookConfig {
+    fn default() -> Self {
+        BookConfig {
+            front_pages: vec![],
+            back_pages: vec![],
+            songs: vec![],
+            preferred_font: "Arial".to_owned(),
+            reorder_pages: true,
+            padding: default_padding(),
+            add_separator: default_add_separator(),
+            tiled_page_size: default_tiled_page_size(),
+        }
+    }
 }

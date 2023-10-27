@@ -76,7 +76,12 @@ pub fn generate_book_pdf(config: &config::BookConfig) -> Result<Vec<u8>, Generat
     if config.reorder_pages {
         pdfium_doc = tile::mix_first_and_last(&pdfium, &pdfium_doc)?;
     }
-    let tiled_doc = tile::tile_pages(pdfium_doc.pages(), 0.9)?;
+    let tiled_doc = tile::tile_pages(
+        pdfium_doc.pages(),
+        1.0 - ((config.padding as f32) / 100.0),
+        config.add_separator,
+        config.tiled_page_size,
+    )?;
     return Ok(tiled_doc.save_to_bytes()?);
 }
 

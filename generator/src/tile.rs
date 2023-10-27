@@ -1,4 +1,7 @@
+use std::fmt;
+
 use pdfium_render::prelude::*;
+use serde::{Deserialize, Serialize};
 
 trait SumUntilIndex<T> {
     fn sum_until_index(self) -> Vec<T>;
@@ -65,40 +68,77 @@ pub fn mix_first_and_last<'a>(
     Ok(new_doc)
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PageSize {
+    A4,
+    A5,
+    A6,
+    A7,
+}
+
+impl fmt::Display for PageSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::A4 => "Full Síða",
+                Self::A5 => "Hálf Síða",
+                Self::A6 => "1/4 Síða",
+                Self::A7 => "1/8 Síða",
+            }
+        )
+    }
+}
+
+pub static PAGE_SIZE_VARIANTS: &[PageSize] =
+    &[PageSize::A4, PageSize::A5, PageSize::A6, PageSize::A7];
+
 pub fn tile_pages<'a>(
     pages: &'a PdfPages,
     scaling_factor: f32,
+    add_separator: bool,
+    tiling: PageSize,
 ) -> Result<PdfDocument<'a>, PdfiumError> {
     let movement_to_center = (1.0 - scaling_factor) / 2.0;
-    let mut tiled_doc = pages.tile_into_new_document(2, 4, PdfPagePaperSize::a4().landscape())?;
+    let (rows_per_page, columns_per_page, page_size) = match tiling {
+        PageSize::A4 => (1, 1, PdfPagePaperSize::a4().portrait()),
+        PageSize::A5 => (1, 2, PdfPagePaperSize::a4().landscape()),
+        PageSize::A6 => (2, 2, PdfPagePaperSize::a4().portrait()),
+        PageSize::A7 => (2, 4, PdfPagePaperSize::a4().landscape()),
+    };
+    let mut tiled_doc = pages.tile_into_new_document(rows_per_page, columns_per_page, page_size)?;
+
     for page_num in 0..tiled_doc.pages().len() {
         let mut page = tiled_doc.pages_mut().get(page_num)?;
         let (page_width, page_height) = (page.width(), page.height());
 
-        // Add the page separators
-        let objects = page.objects_mut();
-        let seperator_color = PdfColor::new(0, 0, 0, 255);
-        for i in 0..5 {
-            let width = page_width * (i as f32 / 4.0);
-            objects.create_path_object_line(
-                width,
-                PdfPoints::ZERO,
-                width,
-                page_height,
-                seperator_color,
-                PdfPoints::new(1.0),
-            )?;
-        }
-        for i in 0..3 {
-            let height = page_height * (i as f32 / 2.0);
-            objects.create_path_object_line(
-                PdfPoints::ZERO,
-                height,
-                page_width,
-                height,
-                seperator_color,
-                PdfPoints::new(1.0),
-            )?;
+        // Add the page separators if requested
+        if add_separator {
+            let objects = page.objects_mut();
+            let separator_color = PdfColor::new(0, 0, 0, 255);
+            for i in 0..(columns_per_page + 1) {
+                let width = page_width * (i as f32 / columns_per_page as f32);
+                objects.create_path_object_line(
+                    width,
+                    PdfPoints::ZERO,
+                    width,
+                    page_height,
+                    separator_color,
+                    PdfPoints::new(1.0),
+                )?;
+            }
+            for i in 0..(rows_per_page + 1) {
+                let height = page_height * (i as f32 / rows_per_page as f32);
+                objects.create_path_object_line(
+                    PdfPoints::ZERO,
+                    height,
+                    page_width,
+                    height,
+                    separator_color,
+                    PdfPoints::new(1.0),
+                )?;
+            }
         }
 
         // Scale each page to add margin for printing

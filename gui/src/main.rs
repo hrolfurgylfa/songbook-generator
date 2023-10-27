@@ -36,6 +36,7 @@ struct State {
     add_song: elements::AddSong,
     add_page: Option<PageLocation>,
     select_font: elements::SelectFont,
+    select_tile_page_size: elements::SelectTilePageSize,
 }
 
 impl State {
@@ -138,8 +139,8 @@ impl eframe::App for State {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         egui::Grid::new("gen_settings").show(ui, |ui| {
-                            ui.label("Endurraða síðum");
-                            ui.checkbox(&mut self.book.reorder_pages, "").write(self);
+                            ui.label("Padding");
+                            ui.add(egui::Slider::new(&mut self.book.padding, 0..=100));
                             ui.end_row();
 
                             ui.label("Leturgerð");
@@ -147,12 +148,32 @@ impl eframe::App for State {
                                 .ui(ui, &mut self.book.preferred_font)
                                 .write(self);
                             ui.end_row();
+
+                            ui.label("Stærð");
+                            ui.push_id("page_size", |ui| {
+                                self.select_tile_page_size
+                                    .ui(ui, &mut self.book.tiled_page_size)
+                                    .write(self);
+                            });
+                            ui.end_row();
                         });
                     });
-                    ui.centered_and_justified(|ui| {
-                        if ui.button("Búa til PDF").clicked() {
-                            helpers::generate_pdf(&self.book);
-                        }
+                    ui.vertical(|ui| {
+                        egui::Grid::new("gen_settings_2").show(ui, |ui| {
+                            ui.label("Aðskilnaðar lína");
+                            ui.checkbox(&mut self.book.add_separator, "").write(self);
+                            ui.end_row();
+
+                            ui.label("Endurraða síðum");
+                            ui.checkbox(&mut self.book.reorder_pages, "").write(self);
+                            ui.end_row();
+                        });
+
+                        ui.centered_and_justified(|ui| {
+                            if ui.button("Búa til PDF").clicked() {
+                                helpers::generate_pdf(&self.book);
+                            }
+                        });
                     });
                 });
             });

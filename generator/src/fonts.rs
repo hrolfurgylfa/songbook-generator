@@ -157,6 +157,7 @@ pub fn get_fonts() -> Result<Vec<String>, FontError> {
         }
     }
 
+    family_names.sort();
     Ok(family_names)
 }
 
