@@ -3,7 +3,7 @@ pub mod fonts;
 pub mod gen_pdfs;
 pub mod tile;
 
-use std::{fmt::Display, fs};
+use std::{collections::HashMap, fmt::Display, fs};
 
 use fonts::FontError;
 use pdfium_render::prelude::{Pdfium, PdfiumError};
@@ -110,23 +110,52 @@ pub fn load_song(title: &str) -> Result<config::Song, String> {
 
         if name == title {
             let body = fs::read_to_string(path.clone()).unwrap();
-            return Ok(parse_song_body(name.to_owned(), &body));
+            return parse_song_body(name.to_owned(), &body);
         }
     }
 
     Err("Song not found".to_owned())
 }
 
-pub fn parse_song_body(title: impl ToString, body: &str) -> config::Song {
+pub fn parse_song_body(title: impl ToString, body: &str) -> Result<config::Song, String> {
+    let title = title.to_string();
+    let tag_err =
+        |i: usize, msg: &str| Err(format!("{} in line {} of song {}", msg, i + 1, &title));
     let mut verses = Vec::new();
     let mut current_verse = String::new();
+    let mut tags = HashMap::new();
+    let mut tag_parsing_mode = false;
 
-    for line in body.lines().map(|l| l.trim()) {
+    for (i, line) in body.lines().map(|l| l.trim()).enumerate() {
+        // We don't want any verse logic in tag parsing mode
+        if tag_parsing_mode {
+            if let Some(splitter_loc) = line.find(':') {
+                if line.len() <= splitter_loc + 1 {
+                    return tag_err(i, "Expected some string after : separator");
+                }
+                let key = line[..splitter_loc].trim().to_lowercase();
+                let value = line[splitter_loc + 1..]
+                    .split(";")
+                    .map(|s| s.trim().to_owned())
+                    .collect();
+                tags.insert(key, value);
+            } else {
+                return tag_err(i, "Expected : to separate key from value");
+            }
+            continue;
+        }
+
         // If we have double new line, a new verse has started. Verses can't be empty though, so
         // only push the current verse if it's not empty.
         if line.is_empty() && !current_verse.is_empty() {
             verses.push(current_verse);
             current_verse = String::new();
+            continue;
+        }
+
+        // Check if we should switch to tag parsing
+        if line.chars().all(|c| c == '-') && line.len() >= 4 {
+            tag_parsing_mode = true;
             continue;
         }
 
@@ -143,8 +172,69 @@ pub fn parse_song_body(title: impl ToString, body: &str) -> config::Song {
         verses.push(current_verse);
     }
 
-    config::Song {
-        title: title.to_string(),
+    Ok(config::Song {
+        title,
         body: verses,
+        tags,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SONG_BODY: &str = r"
+        Hann ljótur er á litinn 
+        og líka er striginn slitinn, 
+        þó bragðast vel hver bitinn 
+        úr bakpokanum enn. 
+
+        Á mörgum fjallatindi 
+        í miklu frosti og vindi 
+        hann var það augnayndi, 
+        sem elska svangir menn. 
+    ";
+
+    const PARSED_SONG_BODY: &[&str] = &[
+        r"Hann ljótur er á litinn
+og líka er striginn slitinn,
+þó bragðast vel hver bitinn
+úr bakpokanum enn.",
+        r"Á mörgum fjallatindi
+í miklu frosti og vindi
+hann var það augnayndi,
+sem elska svangir menn.",
+    ];
+
+    fn default_parse_song(extra_body: &str) -> (Result<config::Song, String>, config::Song) {
+        let parsed_song = parse_song_body("Aa", &(SONG_BODY.to_owned() + extra_body));
+        let expected_song = config::Song {
+            title: "Aa".to_owned(),
+            body: PARSED_SONG_BODY.iter().map(|v| (*v).to_owned()).collect(),
+            tags: HashMap::new(),
+        };
+        (parsed_song, expected_song)
+    }
+
+    #[test]
+    fn test_parse_song_body_no_tags() {
+        let (parsed, expected) = default_parse_song("");
+        assert_eq!(parsed, Ok(expected));
+    }
+
+    #[test]
+    fn test_parse_song_body_simple_tags() {
+        let tags = r"----
+        hÖfUnDur: Jón Jónsson
+        árTal  : 1976";
+        let (parsed, expected) = default_parse_song(tags);
+        let parsed = parsed.unwrap();
+        assert_eq!(
+            parsed.tags,
+            [("höfundur", ["Jón Jónsson"]), ("ártal", ["1976"])]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.map(|s| s.to_owned()).to_vec()))
+                .collect()
+        );
     }
 }

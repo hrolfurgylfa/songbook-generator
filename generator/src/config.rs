@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::tile;
@@ -75,6 +77,8 @@ pub struct Song {
     pub title: String,
     #[serde(skip)]
     pub body: Vec<String>,
+    #[serde(skip)]
+    pub tags: HashMap<String, Vec<String>>,
 }
 
 impl std::fmt::Display for Song {
